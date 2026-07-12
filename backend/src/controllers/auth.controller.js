@@ -5,6 +5,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { sql } from "../db/db.js";
 import { ROLES } from "../utils/roles.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+
 const normalizeRole = (role) => {
     if (!role) return null;
     const cleanedRole = role.trim().toLowerCase();
@@ -45,8 +46,6 @@ const login = asyncHandler(async (req, res) => {
     if (!normalizedRole) {
         throw new ApiError(400, "Invalid role provided.");
     }
-
-    console.log(normalizedRole)
 
     const users = await sql`
         SELECT id, name, email, password_hash, role, status, failed_login_attempts, last_login_attempt
@@ -107,5 +106,49 @@ const login = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, responsePayload, "Login successful."));
 });
 
-export { login };
+const register = asyncHandler(async (req, res) => {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password || !role) {
+        throw new ApiError(400, "Name, email, password and role are required.");
+    }
+
+    const normalizedRole = normalizeRole(role);
+    if (!normalizedRole) {
+        throw new ApiError(400, "Invalid role provided.");
+    }
+
+    const existingUser = await sql`
+        SELECT id
+        FROM users
+        WHERE email = ${email}
+    `;
+
+    if (existingUser?.length) {
+        throw new ApiError(409, "User already exists with this email.");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [user] = await sql`
+        INSERT INTO users (name, email, password_hash, role, status)
+        VALUES (${name}, ${email}, ${hashedPassword}, ${normalizedRole}, 'Active')
+        RETURNING id, name, email, role, status
+    `;
+
+    const accessToken = generateAccessToken(user);
+    const responsePayload = {
+        accessToken,
+        user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+        },
+    };
+
+    return res.status(201).json(new ApiResponse(201, responsePayload, "Registration successful."));
+});
+
+export { login, register };
 

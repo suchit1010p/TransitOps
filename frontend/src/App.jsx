@@ -13,6 +13,7 @@ import Maintenance from './pages/Maintenance'
 import FuelExpenses from './pages/FuelExpenses'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
+import ProtectedRoute from './routes/ProtectedRoute'
 
 function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -43,14 +44,16 @@ export default function App() {
           <Route path="/login"     element={<Login />} />
           <Route path="/register"  element={<Register />} />
 
-          <Route path="/dashboard"     element={<DashboardLayout><Dashboard /></DashboardLayout>} />
-          <Route path="/fleet"         element={<DashboardLayout><Fleet /></DashboardLayout>} />
-          <Route path="/drivers"       element={<DashboardLayout><Drivers /></DashboardLayout>} />
-          <Route path="/trips"         element={<DashboardLayout><Trips /></DashboardLayout>} />
-          <Route path="/maintenance"   element={<DashboardLayout><Maintenance /></DashboardLayout>} />
-          <Route path="/fuel-expenses" element={<DashboardLayout><FuelExpenses /></DashboardLayout>} />
-          <Route path="/analytics"     element={<DashboardLayout><Analytics /></DashboardLayout>} />
-          <Route path="/settings"      element={<DashboardLayout><Settings /></DashboardLayout>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard"     element={<DashboardLayout><Dashboard /></DashboardLayout>} />
+            <Route path="/fleet"         element={<DashboardLayout><Fleet /></DashboardLayout>} />
+            <Route path="/drivers"       element={<DashboardLayout><Drivers /></DashboardLayout>} />
+            <Route path="/trips"         element={<DashboardLayout><Trips /></DashboardLayout>} />
+            <Route path="/maintenance"   element={<DashboardLayout><Maintenance /></DashboardLayout>} />
+            <Route path="/fuel-expenses" element={<DashboardLayout><FuelExpenses /></DashboardLayout>} />
+            <Route path="/analytics"     element={<DashboardLayout><Analytics /></DashboardLayout>} />
+            <Route path="/settings"      element={<DashboardLayout><Settings /></DashboardLayout>} />
+          </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

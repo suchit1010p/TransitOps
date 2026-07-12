@@ -1,10 +1,14 @@
 import { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
+import { registerAuth } from '../features/auth/authSlice.js'
 import './Login.css'
 import './Register.css'
 
 export default function Register() {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const { loading, error } = useSelector((state) => state.auth)
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', role: 'Dispatcher' })
   const [success, setSuccess] = useState(false)
   const [errors, setErrors] = useState({})
@@ -20,11 +24,21 @@ export default function Register() {
     return err
   }
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const err = validate()
     if (Object.keys(err).length > 0) { setErrors(err); return }
     setErrors({})
-    setSuccess(true)
+
+    const result = await dispatch(registerAuth({
+      name: form.name,
+      email: form.email,
+      password: form.password,
+      role: form.role,
+    }))
+
+    if (registerAuth.fulfilled.match(result)) {
+      setSuccess(true)
+    }
   }
 
   return (
@@ -84,6 +98,13 @@ export default function Register() {
               <h1 className="login-title">Create your account</h1>
               <p className="login-subtitle">Fill in the details to get started</p>
 
+              {error && (
+                <div className="login-error-box">
+                  <div className="login-error-label">✕ Registration Failed</div>
+                  <div className="login-error-item">{typeof error === 'string' ? error : error.message || 'Unable to create account.'}</div>
+                </div>
+              )}
+
               <div className="login-field-group">
                 <label className="login-label">Full Name</label>
                 <input
@@ -142,8 +163,8 @@ export default function Register() {
                 {errors.confirm && <div className="field-error">{errors.confirm}</div>}
               </div>
 
-              <button className="login-btn" onClick={handleRegister}>
-                Create Account
+              <button className="login-btn" onClick={handleRegister} disabled={loading}>
+                {loading ? 'Creating Account...' : 'Create Account'}
               </button>
 
               <div className="register-signin-link">
