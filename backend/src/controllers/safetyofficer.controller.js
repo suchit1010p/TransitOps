@@ -3,6 +3,14 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import { ApiError } from "../utils/ApiError.js"
 import { sql } from "../db/db.js"
 
+const VALID_DRIVER_VALUES = ["Available", "On Trip", "Off Duty", "Suspended"]
+
+const normalizeDriverValue = (value) => {
+    if (!value) return "Available"
+    const normalized = String(value).trim()
+    return VALID_DRIVER_VALUES.includes(normalized) ? normalized : "Available"
+}
+
 // GET operations (Accessible by authenticated users)
 export const getDrivers = asyncHandler(async (req, res) => {
     const drivers = await sql`
@@ -38,6 +46,9 @@ export const addDriver = asyncHandler(async (req, res) => {
         status = "Available",
     } = req.body;
 
+    const safeStatus = normalizeDriverValue(safety_status)
+    const driverStatus = normalizeDriverValue(status)
+
     if (!name || !license_number || !license_category || !license_expiry_date) {
         throw new ApiError(400, "name, license_number, license_category and license_expiry_date are required.")
     }
@@ -57,8 +68,8 @@ export const addDriver = asyncHandler(async (req, res) => {
             ${license_category},
             ${license_expiry_date},
             ${contact_number || null},
-            ${safety_status},
-            ${status}
+            ${safeStatus},
+            ${driverStatus}
         )
         RETURNING id, name, license_number, license_category, license_expiry_date, contact_number, safety_status, status, created_at
     `;
@@ -69,6 +80,7 @@ export const addDriver = asyncHandler(async (req, res) => {
 export const updateDriverStatus = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
+    const driverStatus = normalizeDriverValue(status)
 
     if (!id) {
         throw new ApiError(400, "Driver id is required.")
@@ -80,7 +92,7 @@ export const updateDriverStatus = asyncHandler(async (req, res) => {
 
     const [driver] = await sql`
         UPDATE drivers
-        SET status = ${status}
+        SET status = ${driverStatus}
         WHERE id = ${id}
         RETURNING id, name, license_number, license_category, license_expiry_date, contact_number, safety_status, status, created_at
     `;
@@ -95,6 +107,7 @@ export const updateDriverStatus = asyncHandler(async (req, res) => {
 export const updateDriverSafety = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { safety_status } = req.body;
+    const safeStatus = normalizeDriverValue(safety_status)
 
     if (!id) {
         throw new ApiError(400, "Driver id is required.")
@@ -106,7 +119,7 @@ export const updateDriverSafety = asyncHandler(async (req, res) => {
 
     const [driver] = await sql`
         UPDATE drivers
-        SET safety_status = ${safety_status}
+        SET safety_status = ${safeStatus}
         WHERE id = ${id}
         RETURNING id, name, license_number, license_category, license_expiry_date, contact_number, safety_status, status, created_at
     `;
