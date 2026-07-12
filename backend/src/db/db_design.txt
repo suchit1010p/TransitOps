@@ -1,0 +1,111 @@
+-- Enable UUID generation
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ENUM TYPES
+CREATE TYPE user_role AS ENUM ('Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst');
+CREATE TYPE user_status AS ENUM ('Active', 'Inactive');
+CREATE TYPE driver_status AS ENUM ('Available', 'On Trip', 'Off Duty', 'Suspended');
+CREATE TYPE vehicle_status AS ENUM ('Available', 'On Trip', 'In Shop', 'Retired');
+CREATE TYPE trip_status AS ENUM ('Draft', 'Dispatched', 'Completed', 'Cancelled');
+CREATE TYPE maintenance_status AS ENUM ('Open', 'Closed');
+CREATE TYPE expense_type AS ENUM ('Toll', 'Maintenance', 'Other');
+
+-- USERS
+CREATE TABLE users (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                    VARCHAR(150) NOT NULL,
+    email                   VARCHAR(150) NOT NULL UNIQUE,
+    password_hash           VARCHAR(255) NOT NULL,
+    role                    user_role NOT NULL,
+    status                  user_status NOT NULL DEFAULT 'Active',
+    failed_login_attempts   INTEGER NOT NULL DEFAULT 0,
+    last_login_attempt      TIMESTAMP,
+    created_at              TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- DRIVERS (standalone operational entity, not a system user)
+CREATE TABLE drivers (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                VARCHAR(150) NOT NULL,
+    license_number      VARCHAR(50) NOT NULL UNIQUE,
+    license_category    VARCHAR(20) NOT NULL,
+    license_expiry_date DATE NOT NULL,
+    contact_number      VARCHAR(20),
+    safety_status       driver_status NOT NULL DEFAULT 'Available',
+    status              driver_status NOT NULL DEFAULT 'Available',
+    created_at          TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- VEHICLES
+CREATE TABLE vehicles (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    registration_number VARCHAR(30) NOT NULL UNIQUE,
+    name_model          VARCHAR(100) NOT NULL,
+    type                VARCHAR(50) NOT NULL,
+    max_load_capacity   NUMERIC(10,2) NOT NULL,
+    odometer            NUMERIC(12,2) NOT NULL DEFAULT 0,
+    acquisition_cost    NUMERIC(12,2) NOT NULL,
+    status              vehicle_status NOT NULL DEFAULT 'Available',
+    region              VARCHAR(100),
+    created_at          TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- TRIPS
+CREATE TABLE trips (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vehicle_id          UUID NOT NULL REFERENCES vehicles(id),
+    driver_id           UUID NOT NULL REFERENCES drivers(id),
+    created_by          UUID NOT NULL REFERENCES users(id),
+    source              VARCHAR(150) NOT NULL,
+    destination         VARCHAR(150) NOT NULL,
+    cargo_weight        NUMERIC(10,2) NOT NULL,
+    planned_distance    NUMERIC(10,2) NOT NULL,
+    actual_distance     NUMERIC(10,2),
+    status              trip_status NOT NULL DEFAULT 'Draft',
+    dispatched_at       TIMESTAMP,
+    completed_at        TIMESTAMP,
+    created_at          TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT chk_cargo_weight CHECK (cargo_weight >= 0)
+);
+
+-- MAINTENANCE LOGS
+CREATE TABLE maintenance_logs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vehicle_id      UUID NOT NULL REFERENCES vehicles(id),
+    service_type    VARCHAR(100) NOT NULL,
+    cost            NUMERIC(12,2) NOT NULL DEFAULT 0,
+    date            DATE NOT NULL DEFAULT CURRENT_DATE,
+    status          maintenance_status NOT NULL DEFAULT 'Open'
+);
+
+-- FUEL LOGS
+CREATE TABLE fuel_logs (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vehicle_id  UUID NOT NULL REFERENCES vehicles(id),
+    trip_id     UUID REFERENCES trips(id),
+    liters      NUMERIC(10,2) NOT NULL,
+    cost        NUMERIC(10,2) NOT NULL,
+    log_date    DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
+-- EXPENSES
+CREATE TABLE expenses (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vehicle_id      UUID NOT NULL REFERENCES vehicles(id),
+    trip_id         UUID REFERENCES trips(id),
+    expense_type    expense_type NOT NULL,
+    amount          NUMERIC(12,2) NOT NULL,
+    expense_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+    description     TEXT
+);
+
+-- INDEXES
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_trips_vehicle_id ON trips(vehicle_id);
+CREATE INDEX idx_trips_driver_id ON trips(driver_id);
+CREATE INDEX idx_trips_status ON trips(status);
+CREATE INDEX idx_vehicles_status ON vehicles(status);
+CREATE INDEX idx_drivers_status ON drivers(status);
+CREATE INDEX idx_maintenance_vehicle_id ON maintenance_logs(vehicle_id);
+CREATE INDEX idx_fuel_logs_vehicle_id ON fuel_logs(vehicle_id);
+CREATE INDEX idx_expenses_vehicle_id ON expenses(vehicle_id);

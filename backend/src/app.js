@@ -4,6 +4,7 @@ import cors from "cors"
 import cookieParser from "cookie-parser"
 
 
+
 const app = express();
 
 const allowedOrigin = process.env.CORS_ORIGIN 
@@ -22,6 +23,10 @@ app.use(express.static("public"));
 app.use(cookieParser());
 
 
+import { login } from "./controllers/auth.controller.js"
+
+
+app.post("/api/v1/login", login);
 
 
 app.use((err, req, res, next) => {
