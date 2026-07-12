@@ -1,4 +1,5 @@
 import { useTheme } from '../context/ThemeContext'
+import { useSelector } from 'react-redux'
 
 const THEME_OPTIONS = [
   { value: 'dark',   icon: '🌙' },
@@ -8,6 +9,19 @@ const THEME_OPTIONS = [
 
 export default function Header({ onMenuClick }) {
   const { theme, setTheme } = useTheme()
+  const user = useSelector((state) => state.auth.user)
+
+  const fullName = user?.fullName || user?.name || 'Guest'
+  const role = user?.role || 'User'
+
+  // Shorten name: "Raven Kumar" -> "Raven K."
+  const nameParts = fullName.trim().split(' ')
+  const displayName = nameParts.length > 1
+    ? `${nameParts[0]} ${nameParts[1][0]}.`
+    : nameParts[0]
+
+  // Initials for avatar: "Raven Kumar" -> "RK"
+  const initials = nameParts.map(p => p[0]?.toUpperCase()).slice(0, 2).join('')
 
   return (
     <header className="top-header">
@@ -35,10 +49,10 @@ export default function Header({ onMenuClick }) {
 
       {/* User profile */}
       <div className="header-user">
-        <span className="header-user-name">Raven K.</span>
+        <span className="header-user-name">{displayName}</span>
         <div className="user-badge">
-          <span>Dispatcher</span>
-          <div className="user-avatar">RK</div>
+          <span>{role}</span>
+          <div className="user-avatar">{initials}</div>
         </div>
       </div>
     </header>

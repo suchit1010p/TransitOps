@@ -5,8 +5,70 @@ import { sql } from "../db/db.js"
 
 // GET operations (Accessible by everyone via verifyAuth)
 export const getDispatcherDashboard = asyncHandler(async (req, res) => {
-    // Logic for dashboard
-    return res.status(200).json(new ApiResponse(200, {}, "Dispatcher dashboard retrieved successfully (viewed by all)"))
+    // Vehicle KPIs
+    const [vehicleKpis] = await sql`
+        SELECT
+            COUNT(*) as total_vehicles,
+            COUNT(*) FILTER (WHERE status = 'Available') as available_vehicles,
+            COUNT(*) FILTER (WHERE status = 'In Shop') as in_maintenance,
+            COUNT(*) FILTER (WHERE status NOT IN ('Retired')) as active_vehicles
+        FROM vehicles
+    `;
+
+    // Trip KPIs
+    const [tripKpis] = await sql`
+        SELECT
+            COUNT(*) FILTER (WHERE status = 'Dispatched') as active_trips,
+            COUNT(*) FILTER (WHERE status = 'Draft') as pending_trips
+        FROM trips
+    `;
+
+    // Drivers on duty
+    const [driverKpis] = await sql`
+        SELECT COUNT(*) FILTER (WHERE status = 'On Trip') as drivers_on_duty
+        FROM drivers
+    `;
+
+    // Fleet utilization
+    const totalVehicles = Number(vehicleKpis.total_vehicles);
+    const availableVehicles = Number(vehicleKpis.available_vehicles);
+    const fleetUtilization = totalVehicles > 0
+        ? Math.round(((totalVehicles - availableVehicles) / totalVehicles) * 100)
+        : 0;
+
+    // Vehicle status breakdown (for chart)
+    const vehicleStatusBreakdown = await sql`
+        SELECT status, COUNT(*) as count
+        FROM vehicles
+        GROUP BY status
+    `;
+
+    // Recent trips (last 10)
+    const recentTrips = await sql`
+        SELECT
+            t.id, t.source, t.destination, t.status, t.created_at,
+            v.name_model as vehicle_name, v.registration_number,
+            d.name as driver_name
+        FROM trips t
+        LEFT JOIN vehicles v ON t.vehicle_id = v.id
+        LEFT JOIN drivers d ON t.driver_id = d.id
+        ORDER BY t.created_at DESC
+        LIMIT 10
+    `;
+
+    return res.status(200).json(new ApiResponse(200, {
+        kpis: {
+            activeVehicles: Number(vehicleKpis.active_vehicles),
+            availableVehicles: Number(vehicleKpis.available_vehicles),
+            inMaintenance: Number(vehicleKpis.in_maintenance),
+            activeTrips: Number(tripKpis.active_trips),
+            pendingTrips: Number(tripKpis.pending_trips),
+            driversOnDuty: Number(driverKpis.drivers_on_duty),
+            fleetUtilization,
+        },
+        vehicleStatusBreakdown,
+        recentTrips,
+    }, "Dashboard data retrieved successfully."))
 })
 
 export const getTrips = asyncHandler(async (req, res) => {

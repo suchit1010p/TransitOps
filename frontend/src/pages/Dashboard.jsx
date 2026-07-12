@@ -1,21 +1,39 @@
+import { useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
 import StatusBadge from '../components/StatusBadge'
 import './Dashboard.css'
 
-const recentTrips = [
-  { trip: 'TR001', vehicle: 'VAN-05', driver: 'Alex', status: 'On Trip', eta: '45 min' },
-  { trip: 'TR002', vehicle: 'TRK-12', driver: 'John', status: 'Completed', eta: '—' },
-  { trip: 'TR003', vehicle: 'MINI-08', driver: 'Priya', status: 'Dispatched', eta: 'In 10m' },
-  { trip: 'TR004', vehicle: '—', driver: '—', status: 'Draft', eta: 'Awaiting vehicle' },
-]
+const API = 'http://localhost:8000/api/v1'
 
-const vehicleStatus = [
-  { label: 'Available', pct: 75, color: '#22c55e' },
-  { label: 'On Trip', pct: 30, color: '#3b82f6' },
-  { label: 'In Shop', pct: 10, color: '#f97316' },
-  { label: 'Retired', pct: 5, color: '#f87171' },
-]
+const STATUS_COLORS = {
+  Available: '#22c55e',
+  'On Trip': '#3b82f6',
+  'In Shop': '#f97316',
+  Retired: '#f87171',
+}
 
 export default function Dashboard() {
+  const token = useSelector((state) => state.auth.token)
+  const [dash, setDash] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!token) { setLoading(false); return }
+    fetch(`${API}/dispatcher-dashboard`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(j => { setDash(j.data); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [token])
+
+  const kpis = dash?.kpis || {}
+  const recentTrips = dash?.recentTrips || []
+  const breakdown = dash?.vehicleStatusBreakdown || []
+  const totalVehicles = breakdown.reduce((s, v) => s + Number(v.count), 0) || 1
+
+  const fmt = (n) => String(n ?? 0).padStart(2, '0')
+
   return (
     <div className="page-content">
       {/* Filters */}
@@ -27,15 +45,19 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Row */}
-      <div className="stats-row">
-        <div className="stat-card"><div className="stat-card-label">Active Vehicles</div><div className="stat-card-value">53</div></div>
-        <div className="stat-card"><div className="stat-card-label">Available Vehicles</div><div className="stat-card-value">42</div></div>
-        <div className="stat-card"><div className="stat-card-label">Vehicles in Maintenance</div><div className="stat-card-value orange">05</div></div>
-        <div className="stat-card"><div className="stat-card-label">Active Trips</div><div className="stat-card-value">18</div></div>
-        <div className="stat-card"><div className="stat-card-label">Pending Trips</div><div className="stat-card-value">09</div></div>
-        <div className="stat-card"><div className="stat-card-label">Drivers on Duty</div><div className="stat-card-value">26</div></div>
-        <div className="stat-card"><div className="stat-card-label">Fleet Utilization</div><div className="stat-card-value">81%</div></div>
-      </div>
+      {loading ? (
+        <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>Loading dashboard...</div>
+      ) : (
+        <div className="stats-row">
+          <div className="stat-card"><div className="stat-card-label">Active Vehicles</div><div className="stat-card-value">{fmt(kpis.activeVehicles)}</div></div>
+          <div className="stat-card"><div className="stat-card-label">Available Vehicles</div><div className="stat-card-value">{fmt(kpis.availableVehicles)}</div></div>
+          <div className="stat-card"><div className="stat-card-label">Vehicles in Maintenance</div><div className="stat-card-value orange">{fmt(kpis.inMaintenance)}</div></div>
+          <div className="stat-card"><div className="stat-card-label">Active Trips</div><div className="stat-card-value">{fmt(kpis.activeTrips)}</div></div>
+          <div className="stat-card"><div className="stat-card-label">Pending Trips</div><div className="stat-card-value">{fmt(kpis.pendingTrips)}</div></div>
+          <div className="stat-card"><div className="stat-card-label">Drivers on Duty</div><div className="stat-card-value">{fmt(kpis.driversOnDuty)}</div></div>
+          <div className="stat-card"><div className="stat-card-label">Fleet Utilization</div><div className="stat-card-value">{kpis.fleetUtilization ?? 0}%</div></div>
+        </div>
+      )}
 
       {/* Bottom Grid */}
       <div className="dashboard-grid">
@@ -45,21 +67,21 @@ export default function Dashboard() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Trip</th>
+                <th>Source → Dest</th>
                 <th>Vehicle</th>
                 <th>Driver</th>
                 <th>Status</th>
-                <th>ETA</th>
               </tr>
             </thead>
             <tbody>
-              {recentTrips.map((t) => (
-                <tr key={t.trip}>
-                  <td style={{ fontWeight: 700 }}>{t.trip}</td>
-                  <td>{t.vehicle}</td>
-                  <td>{t.driver}</td>
+              {recentTrips.length === 0 ? (
+                <tr><td colSpan={4} style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 20 }}>No trips yet</td></tr>
+              ) : recentTrips.map((t) => (
+                <tr key={t.id}>
+                  <td style={{ fontWeight: 600 }}>{t.source} → {t.destination}</td>
+                  <td>{t.vehicle_name || '—'}</td>
+                  <td>{t.driver_name || '—'}</td>
                   <td><StatusBadge status={t.status} /></td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{t.eta}</td>
                 </tr>
               ))}
             </tbody>
@@ -69,14 +91,20 @@ export default function Dashboard() {
         {/* Vehicle Status */}
         <div className="dashboard-vehicle-status">
           <div className="section-title">Vehicle Status</div>
-          {vehicleStatus.map((v) => (
-            <div key={v.label} className="vs-row">
-              <div className="vs-label">{v.label}</div>
-              <div className="vs-bar-track">
-                <div className="vs-bar-fill" style={{ width: `${v.pct}%`, background: v.color }} />
+          {['Available', 'On Trip', 'In Shop', 'Retired'].map((label) => {
+            const entry = breakdown.find(b => b.status === label)
+            const count = entry ? Number(entry.count) : 0
+            const pct = Math.round((count / totalVehicles) * 100)
+            return (
+              <div key={label} className="vs-row">
+                <div className="vs-label">{label}</div>
+                <div className="vs-bar-track">
+                  <div className="vs-bar-fill" style={{ width: `${pct}%`, background: STATUS_COLORS[label] }} />
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8, minWidth: 24 }}>{count}</div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
