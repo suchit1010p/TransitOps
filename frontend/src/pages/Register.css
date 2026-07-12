@@ -1,0 +1,67 @@
+/* Register-specific styles (shared Login.css handles base styles) */
+
+.register-info-box {
+  background: rgba(200, 127, 10, 0.06);
+  border: 1px solid rgba(200, 127, 10, 0.25);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 20px;
+}
+
+.register-info-title {
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.register-info-body {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.6;
+}
+
+.register-role-chip {
+  font-size: 10px;
+  color: #999;
+  padding: 3px 0;
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+  margin-bottom: 4px;
+}
+
+/* Field-level error message */
+.field-error {
+  font-size: 10px;
+  color: #f87171;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Sign in link at bottom */
+.register-signin-link {
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+  margin-top: 16px;
+}
+
+.register-link {
+  color: #5b9bd5;
+  cursor: pointer;
+  font-weight: 700;
+}
+.register-link:hover { text-decoration: underline; }
+
+/* Success screen */
+.register-success {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.register-success-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+}
