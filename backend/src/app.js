@@ -2,8 +2,9 @@ import express from "express"
 import dotenv from "dotenv"
 import cors from "cors"
 import cookieParser from "cookie-parser"
-
-
+import authRoutes from "./routes/auth.route.js"
+import fleetManagerRoutes from "./routes/fleetmanager.route.js"
+import safetyOfficerRoutes from "./routes/safetyofficer.route.js"
 
 const app = express();
 
@@ -16,18 +17,14 @@ app.use(cors({
     credentials: true
 }))
 
-
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
-
-import { login } from "./controllers/auth.controller.js"
-
-
-app.post("/api/v1/login", login);
-
+app.use("/api/v1", authRoutes);
+app.use("/api/v1", fleetManagerRoutes);
+app.use("/api/v1", safetyOfficerRoutes);
 
 app.use((err, req, res, next) => {
     const statusCode = err?.statusCode || 500;
