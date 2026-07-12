@@ -146,22 +146,7 @@ export default function Maintenance() {
           </div>
         )}
 
-        {/* Status Flow Diagram */}
-        <div className="status-flow" style={{ marginTop: 20 }}>
-          <div className="flow-row">
-            <span className="flow-badge available">Available</span>
-            <span className="flow-arrow"> ──[add record]──► </span>
-            <span className="flow-badge in-shop">In Shop</span>
-          </div>
-          <div className="flow-row" style={{ marginTop: 8 }}>
-            <span className="flow-badge in-shop">In Shop</span>
-            <span className="flow-arrow"> ──[close record]──► </span>
-            <span className="flow-badge available">Available</span>
-          </div>
-        </div>
-        <div className="rule-notice" style={{ marginTop: 10 }}>
-          Note: In Shop vehicles are removed from the dispatch pool.
-        </div>
+
       </div>
 
       {/* Right: Service Log */}

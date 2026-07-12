@@ -225,9 +225,6 @@ export default function Trips() {
           </div>
         )}
 
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 14, fontStyle: 'italic' }}>
-          On Complete: odometer → updated · vehicle &amp; driver revert to Available
-        </div>
       </div>
 
       {/* RIGHT: Live Board */}
