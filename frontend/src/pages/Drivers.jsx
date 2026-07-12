@@ -1,50 +1,87 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
+import { addDriver, getDrivers, updateDriverSafety, updateDriverStatus } from '../features/driver/driverSlice.js'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-const initialDrivers = [
-  { id: 1, name: 'Alex',   license: 'DL-88213', category: 'LMV', expiry: '2028-12-01', contact: '98765xxxxx', completion: '96', status: 'Available' },
-  { id: 2, name: 'John',   license: 'DL-44120', category: 'HMV', expiry: '2025-03-01', contact: '98220xxxxx', completion: '81', status: 'Suspended' },
-  { id: 3, name: 'Priya',  license: 'DL-77031', category: 'LMV', expiry: '2026-08-01', contact: '99110xxxxx', completion: '99', status: 'On Trip' },
-  { id: 4, name: 'Suresh', license: 'DL-90045', category: 'HMV', expiry: '2027-01-01', contact: '97440xxxxx', completion: '88', status: 'Off Duty' },
-]
+const VALID_DRIVER_VALUES = ['Available', 'On Trip', 'Off Duty', 'Suspended']
 
-const emptyForm = { name: '', license: '', category: 'LMV', expiry: '', contact: '', status: 'Available' }
+const emptyForm = {
+  name: '',
+  license: '',
+  category: 'LMV',
+  expiry: '',
+  contact: '',
+  status: 'Available',
+  safety_status: 'Available',
+}
 
 const isExpired = (dateStr) => dateStr && new Date(dateStr) < new Date()
 
-export default function Drivers() {
-  const [drivers,  setDrivers]  = useState(initialDrivers)
-  const [showModal, setShowModal] = useState(false)
-  const [form,     setForm]     = useState(emptyForm)
-  const [errors,   setErrors]   = useState({})
+const normalizeDriverValue = (value) => {
+  return VALID_DRIVER_VALUES.includes(value) ? value : 'Available'
+}
 
-  const update = (f) => (e) => setForm({ ...form, [f]: e.target.value })
+export default function Drivers() {
+  const dispatch = useDispatch()
+  const { items: drivers, loading, error, message } = useSelector((state) => state.driver)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState(emptyForm)
+  const [errors, setErrors] = useState({})
+
+  useEffect(() => {
+    dispatch(getDrivers())
+  }, [dispatch])
+
+  const update = (field) => (event) => setForm({ ...form, [field]: event.target.value })
 
   const validate = () => {
     const err = {}
-    if (!form.name.trim())    err.name    = 'Driver name is required'
+    if (!form.name.trim()) err.name = 'Driver name is required'
     if (!form.license.trim()) err.license = 'License number is required'
-    if (!form.expiry)         err.expiry  = 'License expiry date is required'
+    if (!form.expiry) err.expiry = 'License expiry date is required'
     if (!form.contact.trim()) err.contact = 'Contact number is required'
     return err
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const err = validate()
-    if (Object.keys(err).length > 0) { setErrors(err); return }
-    setDrivers([...drivers, { ...form, id: Date.now(), completion: '0' }])
-    setForm(emptyForm)
-    setErrors({})
-    setShowModal(false)
+    if (Object.keys(err).length > 0) {
+      setErrors(err)
+      return
+    }
+
+    const result = await dispatch(addDriver({
+      name: form.name,
+      license_number: form.license,
+      license_category: form.category,
+      license_expiry_date: form.expiry,
+      contact_number: form.contact,
+      status: normalizeDriverValue(form.status),
+      safety_status: normalizeDriverValue(form.safety_status),
+    }))
+
+    if (addDriver.fulfilled.match(result)) {
+      setForm(emptyForm)
+      setErrors({})
+      setShowModal(false)
+    }
   }
 
-  const formatDate = (d) => {
-    if (!d) return '—'
-    const date = new Date(d)
-    return `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
+  const handleStatusChange = (id, status) => {
+    dispatch(updateDriverStatus({ id, status: normalizeDriverValue(status) }))
+  }
+
+  const handleSafetyChange = (id, safety_status) => {
+    dispatch(updateDriverSafety({ id, safety_status: normalizeDriverValue(safety_status) }))
+  }
+
+  const formatDate = (date) => {
+    if (!date) return '—'
+    const parsed = new Date(date)
+    return `${String(parsed.getMonth() + 1).padStart(2, '0')}/${parsed.getFullYear()}`
   }
 
   return (
@@ -56,6 +93,9 @@ export default function Drivers() {
         </button>
       </div>
 
+      {error && <div className="form-err-msg" style={{ marginBottom: 12 }}>{error}</div>}
+      {message && <div style={{ color: '#22c55e', marginBottom: 12 }}>{message}</div>}
+
       <table className="data-table">
         <thead>
           <tr>
@@ -64,22 +104,54 @@ export default function Drivers() {
             <th>Category</th>
             <th>Expiry</th>
             <th>Contact</th>
-            <th>Trip Compl.</th>
+            <th>Safety</th>
             <th>Status</th>
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => (
-            <tr key={d.id}>
-              <td style={{ fontWeight: 700 }}>{d.name}</td>
-              <td>{d.license}</td>
-              <td>{d.category}</td>
-              <td style={{ color: isExpired(d.expiry) ? '#f87171' : 'inherit' }}>
-                {formatDate(d.expiry)}{isExpired(d.expiry) ? ' EXPIRED' : ''}
+          {loading && !drivers.length ? (
+            <tr>
+              <td colSpan="7" style={{ textAlign: 'center' }}>Loading drivers...</td>
+            </tr>
+          ) : !drivers.length ? (
+            <tr>
+              <td colSpan="7" style={{ textAlign: 'center' }}>No drivers found.</td>
+            </tr>
+          ) : drivers.map((driver) => (
+            <tr key={driver.id}>
+              <td style={{ fontWeight: 700 }}>{driver.name}</td>
+              <td>{driver.license_number}</td>
+              <td>{driver.license_category}</td>
+              <td style={{ color: isExpired(driver.license_expiry_date) ? '#f87171' : 'inherit' }}>
+                {formatDate(driver.license_expiry_date)}{isExpired(driver.license_expiry_date) ? ' EXPIRED' : ''}
               </td>
-              <td>{d.contact}</td>
-              <td>{d.completion}%</td>
-              <td><StatusBadge status={d.status} /></td>
+              <td>{driver.contact_number || '—'}</td>
+              <td>
+                <select
+                  className="form-input"
+                  value={driver.safety_status || 'Available'}
+                  onChange={(event) => handleSafetyChange(driver.id, event.target.value)}
+                  style={{ minWidth: 110 }}
+                >
+                  <option value="Available">Available</option>
+                  <option value="On Trip">On Trip</option>
+                  <option value="Off Duty">Off Duty</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </td>
+              <td>
+                <select
+                  className="form-input"
+                  value={driver.status || 'Available'}
+                  onChange={(event) => handleStatusChange(driver.id, event.target.value)}
+                  style={{ minWidth: 110 }}
+                >
+                  <option value="Available">Available</option>
+                  <option value="On Trip">On Trip</option>
+                  <option value="Off Duty">Off Duty</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -88,8 +160,8 @@ export default function Drivers() {
       <div style={{ marginTop: 20 }}>
         <div className="section-title">Toggle Status Legend</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {['Available', 'On Trip', 'Off Duty', 'Suspended'].map((s) => (
-            <StatusBadge key={s} status={s} />
+          {['Available', 'On Trip', 'Off Duty', 'Suspended'].map((status) => (
+            <StatusBadge key={status} status={status} />
           ))}
         </div>
       </div>
@@ -98,7 +170,6 @@ export default function Drivers() {
         Rule: Expired license or Suspended status → blocked from trip assignment
       </div>
 
-      {/* Add Driver Modal */}
       {showModal && (
         <Modal title="Add New Driver" onClose={() => setShowModal(false)}>
           <div className="form-group">
@@ -126,8 +197,8 @@ export default function Drivers() {
             <div className="form-group">
               <label className="form-label">License Category</label>
               <select className="form-input" value={form.category} onChange={update('category')}>
-                <option>LMV</option>
-                <option>HMV</option>
+                <option value="LMV">LMV</option>
+                <option value="HMV">HMV</option>
               </select>
             </div>
           </div>
@@ -156,13 +227,24 @@ export default function Drivers() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Status</label>
-            <select className="form-input" value={form.status} onChange={update('status')}>
-              <option>Available</option>
-              <option>Off Duty</option>
-              <option>Suspended</option>
-            </select>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Status</label>
+              <select className="form-input" value={form.status} onChange={update('status')}>
+                <option value="Available">Available</option>
+                <option value="Off Duty">Off Duty</option>
+                <option value="Suspended">Suspended</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Safety Status</label>
+              <select className="form-input" value={form.safety_status} onChange={update('safety_status')}>
+                <option value="Available">Available</option>
+                <option value="On Trip">On Trip</option>
+                <option value="Off Duty">Off Duty</option>
+                <option value="Suspended">Suspended</option>
+              </select>
+            </div>
           </div>
 
           <div className="modal-actions">

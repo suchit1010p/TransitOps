@@ -1,18 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
-
-const initialVehicles = [
-  { id: 1, reg: 'GJ01AB452', name: 'VAN-05',   type: 'Van',   capacity: '500 kg', odometer: '74,000',  cost: '6,20,000',   status: 'Available' },
-  { id: 2, reg: 'GJ01AB998', name: 'TRUCK-11', type: 'Truck', capacity: '5 Ton',  odometer: '182,000', cost: '24,50,000',  status: 'On Trip' },
-  { id: 3, reg: 'GJ01AB120', name: 'MINI-03',  type: 'Mini',  capacity: '1 Ton',  odometer: '66,000',  cost: '4,10,000',   status: 'In Shop' },
-  { id: 4, reg: 'GJ01AB008', name: 'VAN-09',   type: 'Van',   capacity: '750 kg', odometer: '241,900', cost: '5,90,000',   status: 'Retired' },
-]
+import { addVehicles, getVehicals, updateVehicalStatus } from '../features/vehical/vehicalSlice.js'
 
 const emptyForm = { reg: '', name: '', type: 'Van', capacity: '', odometer: '', cost: '', status: 'Available' }
 
+const VALID_VEHICLE_STATUS = ['Available', 'On Trip', 'In Shop', 'Retired']
+
+const normalizeVehicleStatus = (value) => {
+  return VALID_VEHICLE_STATUS.includes(value) ? value : 'Available'
+}
+
 export default function Fleet() {
-  const [vehicles, setVehicles] = useState(initialVehicles)
+  const dispatch = useDispatch()
+  const { items: vehicles, loading, error, message } = useSelector((state) => state.vehicle)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
@@ -20,30 +22,53 @@ export default function Fleet() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [search, setSearch] = useState('')
 
-  const update = (field) => (e) => setForm({ ...form, [field]: e.target.value })
+  useEffect(() => {
+    dispatch(getVehicals())
+  }, [dispatch])
+
+  const update = (field) => (event) => setForm({ ...form, [field]: event.target.value })
 
   const validate = () => {
     const err = {}
-    if (!form.reg.trim())      err.reg = 'Registration No. is required'
-    if (!form.name.trim())     err.name = 'Vehicle name is required'
+    if (!form.reg.trim()) err.reg = 'Registration No. is required'
+    if (!form.name.trim()) err.name = 'Vehicle name is required'
     if (!form.capacity.trim()) err.capacity = 'Capacity is required'
-    if (!form.cost.trim())     err.cost = 'Acquisition cost is required'
+    if (!form.cost.trim()) err.cost = 'Acquisition cost is required'
     return err
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const err = validate()
-    if (Object.keys(err).length > 0) { setErrors(err); return }
-    setVehicles([...vehicles, { ...form, id: Date.now() }])
-    setForm(emptyForm)
-    setErrors({})
-    setShowModal(false)
+    if (Object.keys(err).length > 0) {
+      setErrors(err)
+      return
+    }
+
+    const result = await dispatch(addVehicles({
+      registration_number: form.reg,
+      name_model: form.name,
+      type: form.type,
+      max_load_capacity: form.capacity,
+      odometer: form.odometer || 0,
+      acquisition_cost: form.cost,
+      status: normalizeVehicleStatus(form.status),
+    }))
+
+    if (addVehicles.fulfilled.match(result)) {
+      setForm(emptyForm)
+      setErrors({})
+      setShowModal(false)
+    }
   }
 
-  const filtered = vehicles.filter((v) => {
-    const matchType   = filterType   === 'All' || v.type === filterType
-    const matchStatus = filterStatus === 'All' || v.status === filterStatus
-    const matchSearch = v.reg.toLowerCase().includes(search.toLowerCase()) || v.name.toLowerCase().includes(search.toLowerCase())
+  const handleStatusChange = (id, status) => {
+    dispatch(updateVehicalStatus({ id, status: normalizeVehicleStatus(status) }))
+  }
+
+  const filtered = (vehicles || []).filter((vehicle) => {
+    const matchType = filterType === 'All' || vehicle.type === filterType
+    const matchStatus = filterStatus === 'All' || vehicle.status === filterStatus
+    const matchSearch = `${vehicle.registration_number || ''} ${vehicle.name_model || ''}`.toLowerCase().includes(search.toLowerCase())
     return matchType && matchStatus && matchSearch
   })
 
@@ -63,6 +88,9 @@ export default function Fleet() {
         </button>
       </div>
 
+      {error && <div className="form-err-msg" style={{ marginBottom: 12 }}>{error}</div>}
+      {message && <div style={{ color: '#22c55e', marginBottom: 12 }}>{message}</div>}
+
       <table className="data-table">
         <thead>
           <tr>
@@ -71,20 +99,33 @@ export default function Fleet() {
           </tr>
         </thead>
         <tbody>
-          {filtered.map((v) => (
-            <tr key={v.id}>
-              <td style={{ fontWeight: 700, fontStyle: 'italic' }}>{v.reg}</td>
-              <td style={{ fontWeight: 700 }}>{v.name}</td>
-              <td>{v.type}</td>
-              <td>{v.capacity}</td>
-              <td>{v.odometer}</td>
-              <td>{v.cost}</td>
-              <td><StatusBadge status={v.status} /></td>
+          {loading && !vehicles.length ? (
+            <tr><td colSpan={7} style={{ textAlign: 'center' }}>Loading vehicles...</td></tr>
+          ) : filtered.length === 0 ? (
+            <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No vehicles found</td></tr>
+          ) : filtered.map((vehicle) => (
+            <tr key={vehicle.id}>
+              <td style={{ fontWeight: 700, fontStyle: 'italic' }}>{vehicle.registration_number}</td>
+              <td style={{ fontWeight: 700 }}>{vehicle.name_model}</td>
+              <td>{vehicle.type}</td>
+              <td>{vehicle.max_load_capacity}</td>
+              <td>{vehicle.odometer}</td>
+              <td>{vehicle.acquisition_cost}</td>
+              <td>
+                <select
+                  className="form-input"
+                  value={vehicle.status || 'Available'}
+                  onChange={(event) => handleStatusChange(vehicle.id, event.target.value)}
+                  style={{ minWidth: 120 }}
+                >
+                  <option value="Available">Available</option>
+                  <option value="On Trip">On Trip</option>
+                  <option value="In Shop">In Shop</option>
+                  <option value="Retired">Retired</option>
+                </select>
+              </td>
             </tr>
           ))}
-          {filtered.length === 0 && (
-            <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>No vehicles found</td></tr>
-          )}
         </tbody>
       </table>
       <div className="rule-notice">
