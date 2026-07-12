@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSelector } from 'react-redux'
 import './Settings.css'
 
 const rbacData = [
@@ -8,17 +9,32 @@ const rbacData = [
   { role: 'Financial Analyst', fleet: 'View', drivers: '—', trips: '—',    fuel: '✓',    analytics: '✓' },
 ]
 
+const defaultSettings = {
+  depot: 'Gandhinagar Depot GJ4',
+  currency: 'INR (Rs.)',
+  distanceUnit: 'Kilometers',
+}
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('transitops_settings')
+    return saved ? JSON.parse(saved) : defaultSettings
+  } catch {
+    return defaultSettings
+  }
+}
+
 export default function Settings() {
-  const [form, setForm] = useState({
-    depot: 'Gandhinagar Depot GJ4',
-    currency: 'INR (Rs.)',
-    distanceUnit: 'Kilometers',
-  })
+  const userRole = useSelector((s) => s.auth.user?.role)
+  const userName = useSelector((s) => s.auth.user?.name)
+
+  const [form, setForm] = useState(loadSettings)
   const [saved, setSaved] = useState(false)
 
   const update = (f) => (e) => setForm({ ...form, [f]: e.target.value })
 
   const handleSave = () => {
+    localStorage.setItem('transitops_settings', JSON.stringify(form))
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
@@ -28,6 +44,9 @@ export default function Settings() {
     if (val === 'View') return 'rbac-view'
     return 'rbac-no'
   }
+
+  // Highlight the current user's role row
+  const isCurrentRole = (role) => role === userRole
 
   return (
     <div className="page-content settings-layout">
@@ -58,6 +77,13 @@ export default function Settings() {
         </div>
 
         <button className="btn-save" onClick={handleSave}>Save changes</button>
+
+        {/* User Info */}
+        <div style={{ marginTop: 28, padding: '14px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Logged in as</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{userName || 'Guest'}</div>
+          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>{userRole || 'No Role'}</div>
+        </div>
       </div>
 
       {/* RBAC Table */}
@@ -71,8 +97,8 @@ export default function Settings() {
           </thead>
           <tbody>
             {rbacData.map((r) => (
-              <tr key={r.role}>
-                <td style={{ fontWeight: 700 }}>{r.role}</td>
+              <tr key={r.role} style={isCurrentRole(r.role) ? { background: 'rgba(59,130,246,0.08)', borderLeft: '2px solid #3b82f6' } : {}}>
+                <td style={{ fontWeight: 700 }}>{r.role} {isCurrentRole(r.role) && <span style={{ fontSize: 9, color: '#3b82f6' }}>(you)</span>}</td>
                 <td className={rbacClass(r.fleet)}>{r.fleet}</td>
                 <td className={rbacClass(r.drivers)}>{r.drivers}</td>
                 <td className={rbacClass(r.trips)}>{r.trips}</td>

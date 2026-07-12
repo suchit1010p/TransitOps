@@ -4,6 +4,7 @@ import driverReducer from "../features/driver/driverSlice.js"
 import vehiclesReducer from "../features/vehical/vehicalSlice.js"
 import maintenanceReducer from "../features/maintenance/maintenanceSlice.js"
 import fuelExpenseReducer from "../features/fuelExpense/fuelExpenseSlice.js"
+import tripReducer from "../features/trip/tripSlice.js"
 
 export const store = configureStore({
     reducer: {
@@ -12,6 +13,8 @@ export const store = configureStore({
         vehicle: vehiclesReducer,
         maintenance: maintenanceReducer,
         fuelExpense: fuelExpenseReducer,
+        trip: tripReducer,
     }
 })
+
 
