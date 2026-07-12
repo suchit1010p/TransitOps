@@ -65,3 +65,55 @@ export const addDriver = asyncHandler(async (req, res) => {
 
     return res.status(201).json(new ApiResponse(201, driver, "Driver added successfully."))
 })
+
+export const updateDriverStatus = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id) {
+        throw new ApiError(400, "Driver id is required.")
+    }
+
+    if (!status) {
+        throw new ApiError(400, "status is required.")
+    }
+
+    const [driver] = await sql`
+        UPDATE drivers
+        SET status = ${status}
+        WHERE id = ${id}
+        RETURNING id, name, license_number, license_category, license_expiry_date, contact_number, safety_status, status, created_at
+    `;
+
+    if (!driver) {
+        throw new ApiError(404, "Driver not found.")
+    }
+
+    return res.status(200).json(new ApiResponse(200, driver, "Driver status updated successfully."))
+})
+
+export const updateDriverSafety = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { safety_status } = req.body;
+
+    if (!id) {
+        throw new ApiError(400, "Driver id is required.")
+    }
+
+    if (!safety_status) {
+        throw new ApiError(400, "safety_status is required.")
+    }
+
+    const [driver] = await sql`
+        UPDATE drivers
+        SET safety_status = ${safety_status}
+        WHERE id = ${id}
+        RETURNING id, name, license_number, license_category, license_expiry_date, contact_number, safety_status, status, created_at
+    `;
+
+    if (!driver) {
+        throw new ApiError(404, "Driver not found.")
+    }
+
+    return res.status(200).json(new ApiResponse(200, driver, "Driver safety updated successfully."))
+})

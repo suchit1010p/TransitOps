@@ -72,3 +72,29 @@ export const addVehicle = asyncHandler(async (req, res) => {
 
     return res.status(201).json(new ApiResponse(201, vehicle, "Vehicle added successfully."))
 })
+
+export const updateVehicleStatus = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id) {
+        throw new ApiError(400, "Vehicle id is required.")
+    }
+
+    if (!status) {
+        throw new ApiError(400, "status is required.")
+    }
+
+    const [vehicle] = await sql`
+        UPDATE vehicles
+        SET status = ${status}
+        WHERE id = ${id}
+        RETURNING id, registration_number, name_model, type, max_load_capacity, odometer, acquisition_cost, status, region, created_at
+    `;
+
+    if (!vehicle) {
+        throw new ApiError(404, "Vehicle not found.")
+    }
+
+    return res.status(200).json(new ApiResponse(200, vehicle, "Vehicle status updated successfully."))
+})
