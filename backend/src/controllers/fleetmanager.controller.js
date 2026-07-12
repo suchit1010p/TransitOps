@@ -9,7 +9,14 @@ export const getFleetStatus = asyncHandler(async (req, res) => {
 })
 
 export const getMaintenanceRecords = asyncHandler(async (req, res) => {
-    return res.status(200).json(new ApiResponse(200, {}, "Maintenance records retrieved successfully (viewed by all)"))
+    const records = await sql`
+        SELECT m.id, m.vehicle_id, m.service_type, m.cost, m.date, m.status,
+               v.name_model as vehicle_name, v.registration_number
+        FROM maintenance_logs m
+        LEFT JOIN vehicles v ON m.vehicle_id = v.id
+        ORDER BY m.date DESC
+    `;
+    return res.status(200).json(new ApiResponse(200, records, "Maintenance records retrieved successfully."))
 })
 
 export const getVehicles = asyncHandler(async (req, res) => {
@@ -28,7 +35,57 @@ export const updateFleetStatus = asyncHandler(async (req, res) => {
 })
 
 export const addMaintenanceRecord = asyncHandler(async (req, res) => {
-    return res.status(201).json(new ApiResponse(201, {}, "Maintenance record added successfully (Fleet Manager only)"))
+    const { vehicle_id, service_type, cost, date, status = "Open", notes } = req.body;
+
+    if (!vehicle_id || !service_type || !cost || !date) {
+        throw new ApiError(400, "vehicle_id, service_type, cost, and date are required.");
+    }
+
+    // Insert maintenance record
+    const [record] = await sql`
+        INSERT INTO maintenance_logs (vehicle_id, service_type, cost, date, status)
+        VALUES (
+            ${vehicle_id}, ${service_type}, ${Number(cost)}, ${date}, ${status}
+        )
+        RETURNING *
+    `;
+
+    // If status is Open, update vehicle status to In Shop
+    if (status === "Open") {
+        await sql`UPDATE vehicles SET status = 'In Shop' WHERE id = ${vehicle_id}`;
+    }
+
+    return res.status(201).json(new ApiResponse(201, record, "Maintenance record added successfully."));
+})
+
+export const updateMaintenanceStatus = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id || !status) {
+        throw new ApiError(400, "Maintenance record id and status are required.");
+    }
+
+    // Fetch existing record
+    const records = await sql`SELECT * FROM maintenance_logs WHERE id = ${id}`;
+    if (!records || records.length === 0) {
+        throw new ApiError(404, "Maintenance record not found.");
+    }
+    const record = records[0];
+
+    const [updatedRecord] = await sql`
+        UPDATE maintenance_logs SET status = ${status}
+        WHERE id = ${id} RETURNING *
+    `;
+
+    // Handle vehicle status transitions based on maintenance completion
+    if (status === "Closed" && record.status === "Open") {
+        await sql`UPDATE vehicles SET status = 'Available' WHERE id = ${record.vehicle_id}`;
+    } else if (status === "Open" && record.status === "Closed") {
+        await sql`UPDATE vehicles SET status = 'In Shop' WHERE id = ${record.vehicle_id}`;
+    }
+
+    return res.status(200).json(new ApiResponse(200, updatedRecord, `Maintenance status updated to ${status}.`));
 })
 
 export const addVehicle = asyncHandler(async (req, res) => {

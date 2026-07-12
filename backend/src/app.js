@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser"
 import authRoutes from "./routes/auth.route.js"
 import fleetManagerRoutes from "./routes/fleetmanager.route.js"
 import safetyOfficerRoutes from "./routes/safetyofficer.route.js"
+import dispatcherRoutes from "./routes/dispatcher.route.js"
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(cookieParser());
 app.use("/api/v1", authRoutes);
 app.use("/api/v1", fleetManagerRoutes);
 app.use("/api/v1", safetyOfficerRoutes);
+app.use("/api/v1", dispatcherRoutes);
 
 app.use((err, req, res, next) => {
     const statusCode = err?.statusCode || 500;
